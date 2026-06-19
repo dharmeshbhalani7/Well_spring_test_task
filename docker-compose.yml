@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wellspring-postgres
+    environment:
+      POSTGRES_USER: wellspring
+      POSTGRES_PASSWORD: wellspring
+      POSTGRES_DB: wellspring
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wellspring -d wellspring"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  floci:
+    image: floci/floci:latest
+    container_name: wellspring-floci
+    ports:
+      - "4566:4566"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres_data:

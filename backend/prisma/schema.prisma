@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Creator {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  programs            Program[]
+  sessions            Session[]
+
+
+
+
+  
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  importJobs          ImportJob[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("creators")
+}
+
+model Program {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  title       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Creator   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@index([tenantId])
+  @@map("programs")
+}
+
+model Session {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  programId       String   @map("program_id") @db.Uuid
+  position        Int
+  title           String
+  durationSeconds Int      @map("duration_seconds")
+  instructorName  String   @map("instructor_name")
+  tags            String[]
+  mediaUrl        String?  @map("media_url")
+  clientRowId     String?  @map("client_row_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant  Creator @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, programId, position])
+  @@unique([tenantId, clientRowId])
+  @@index([tenantId, programId])
+  @@map("sessions")
+}
+
+model ImportJob {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  programId      String   @map("program_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key")
+  status         String
+  resultSummary  Json     @map("result_summary")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Creator    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rows   ImportRow[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId])
+  @@map("import_jobs")
+}
+
+model ImportRow {
+  id          String  @id @default(uuid()) @db.Uuid
+  importJobId String  @map("import_job_id") @db.Uuid
+  rowNumber   Int     @map("row_number")
+  clientRowId String? @map("client_row_id")
+  status      String
+  errors      Json?
+  sessionId   String? @map("session_id") @db.Uuid
+
+  importJob ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
+  @@index([importJobId])
+  @@map("import_rows")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Creator @relation("AuditActor", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  creatorId String    @map("creator_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@map("password_reset_tokens")
+}
